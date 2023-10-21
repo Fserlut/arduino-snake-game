@@ -13,34 +13,53 @@ OneButton rightButton(6, true); // right button on d6 pin
 OneButton upButton(7, true);    // up button on d7 pin
 OneButton downButton(5, true);  // down button on d5 pin
 
-class snakeNode
-{
-public:
-  int x;
-  int y;
-  snakeNode *next;
-  snakeNode *prev;
-};
-
-bool gameIsStarted = false;
-
 const char lose_text[] PROGMEM = "GAME OWER";
 
 int currentSize = 1;
+bool gameIsStarted = false;
 
-snakeNode *createNewNode(int x, int y, snakeNode *prev)
+struct node
 {
-  auto n = malloc(sizeof(snakeNode));
-  if (n == NULL)
-  {
-    Serial.print("GAME ERROR");
-    return;
-  }
-  snakeNode n = {
-    x : 3,
-    y : 4,
-    prev : (snakeNode *)&prev,
-  };
+  int x;
+  int y;
+  node *next;
+};
+
+node *head;
+size_t listSize;
+
+void createLinkedList(int x, int y)
+{
+  listSize = 1;
+  head = new node();
+  head->next = nullptr;
+  head->x = x;
+  head->y = y;
+}
+
+void insertHead(int x, int y)
+{
+  node *newHead = new node();
+  newHead->next = head;
+  newHead->x = x;
+  newHead->y = y;
+  head = newHead;
+  listSize++;
+}
+
+void insertTail(int x, int y)
+{
+  node *newTail = new node();
+  newTail->next = nullptr;
+  newTail->x = x;
+  newTail->y = y;
+
+  node *enumerator = head;
+  for (size_t index = 0; index < listSize - 1; index++)
+    enumerator = enumerator->next;
+
+  enumerator->next = newTail;
+  listSize++;
 }
 
 int getCurrentSize()
@@ -76,6 +95,8 @@ void startGame()
   if (!gameIsStarted)
   {
     initLoadingScreen();
+    createLinkedList(3, 4);
+    createLinkedList(4, 4);
     return;
   }
 }
