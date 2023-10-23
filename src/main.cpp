@@ -8,7 +8,7 @@
 const int FRUIT_MAX = 2;
 
 unsigned long lastTimeChanged = millis();
-unsigned long stepDelay = 300;
+unsigned long stepDelay = 500;
 
 unsigned long fruitsDelay = 3000;
 unsigned long lastFruitsChanged = millis();
@@ -23,9 +23,9 @@ OneButton rightButton(6, true); // right button on d6 pin
 OneButton upButton(7, true);    // up button on d7 pin
 OneButton downButton(5, true);  // down button on d5 pin
 
-const char lose_text[] PROGMEM = "GAME OWER";
+const char lose_text[] = "GAME OWER";
 
-bool gameIsStarted = true;
+bool gameIsStarted = false;
 bool gameIsOver = false;
 
 struct SnakeListNode
@@ -101,6 +101,15 @@ void initLoadingScreen()
   lcd.print(getCurrentSize());
 }
 
+void updateCurrentScore()
+{
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Score: ");
+  lcd.setCursor(7, 0);
+  lcd.print(getCurrentSize());
+}
+
 void startGame()
 {
   if (!gameIsStarted)
@@ -108,6 +117,39 @@ void startGame()
     initLoadingScreen();
     // createSnake(3, 4);
     return;
+  }
+}
+
+void fruitWasEated(SnakeListNode *node)
+{
+  for (int i = 0; i < FRUIT_MAX; i++)
+  {
+    if (fruits[i].x == node->x && fruits[i].y == node->y)
+    {
+      // 1-top; 2-bot; 3-left; 4-right
+      switch (lastDirection)
+      {
+      case 1:
+        addNewSnake(snakeHead->x, snakeHead->y + 1 == 8 ? 0 : snakeHead->y + 1);
+        break;
+
+      case 2:
+        addNewSnake(snakeHead->x, snakeHead->y - 1 == -1 ? 7 : snakeHead->y - 1);
+        break;
+
+      case 3:
+        addNewSnake(snakeHead->x - 1 == -1 ? 7 : snakeHead->x - 1, snakeHead->y);
+        break;
+
+      case 4:
+        addNewSnake(snakeHead->x + 1 == 8 ? 0 : snakeHead->x + 1, snakeHead->y);
+        break;
+      }
+
+      fruits[i].x = -2;
+      fruits[i].y = -2;
+      updateCurrentScore();
+    }
   }
 }
 
@@ -141,6 +183,7 @@ void moveSnake(int direction)
   }
   SnakeListNode *iterator = snakeHead->next;
   size_t i = 1;
+  fruitWasEated(snakeHead);
   while (i < snakeSize)
   {
     // 1-top; 2-bot; 3-left; 4-right
@@ -150,6 +193,7 @@ void moveSnake(int direction)
     iterator->y = prevY;
     prevX = oldX;
     prevY = oldY;
+    fruitWasEated(iterator);
     iterator = iterator->next;
     i++;
   }
@@ -227,10 +271,10 @@ void downButtonClick()
 void setup()
 {
   Serial.begin(113310);
-  // lcd.init(); // initialize the lcd
-  // lcd.backlight();
-  mtrx.begin();      // запускаем
-  mtrx.setBright(5); // яркость 0..15
+  lcd.init();
+  lcd.backlight();
+  mtrx.begin();
+  mtrx.setBright(5);
 
   leftButton.attachClick(leftButtonClick);
   rightButton.attachClick(rightButtonClick);
@@ -241,6 +285,7 @@ void setup()
   addNewSnake(2, 4);
   addNewSnake(3, 4);
   addNewSnake(4, 4);
+  updateCurrentScore();
 }
 
 void loop()
@@ -250,7 +295,6 @@ void loop()
   rightButton.tick();
   upButton.tick();
   downButton.tick();
-  // delay(1000);
 
   // if (!gameIsStarted)
   // {
@@ -261,8 +305,8 @@ void loop()
   // else
   // {
   //   delay(1000);
-  //   snakeStep();
-  //   mtrx.update();
+  //   // snakeStep();
+  //   // mtrx.update();
   // }
 
   if (timeNow - lastTimeChanged > stepDelay)
