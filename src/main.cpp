@@ -6,7 +6,8 @@
 #include "OneButton.h"
 
 unsigned long lastTimeChanged = millis();
-unsigned long stepDelay = 500;
+unsigned long stepDelay = 700;
+int lastDirection = 4;
 
 MAX7219<1, 1, 9> mtrx; // CS PIN D9, DIN PIN D13, CLK PIN D11
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -19,121 +20,41 @@ OneButton downButton(5, true);  // down button on d5 pin
 const char lose_text[] PROGMEM = "GAME OWER";
 
 bool gameIsStarted = true;
+bool gameIsOver = false;
 
 struct SnakeNode
 {
   int x;
   int y;
-  int direction; // 1-top; 2-bot; 3-left; 4-right
-  SnakeNode *next;
-  SnakeNode *prev;
+  // int direction; // 1-top; 2-bot; 3-left; 4-right
 };
 
-struct MoveNode
+struct SnakeListNode
 {
-  int x;      // Coords when move was created
-  int y;      // Coords when move was created
-  int moveTo; // 1-top; 2-bot; 3-left; 4-right
-  int doneBy; // Counter done all dots or not
+  int x;
+  int y;
 
-  MoveNode *next;
+  SnakeListNode *next;
+  // int direction; // 1-top; 2-bot; 3-left; 4-right
 };
 
-MoveNode *moveHead;
-SnakeNode *snakeHead;
+SnakeListNode *snakeHead;
+
 size_t snakeSize;
-size_t moveSize = 0;
 
-MoveNode *getLastMove()
-{
-  MoveNode *iteratop = moveHead;
-  while (iteratop->next != NULL)
-  {
-    iteratop = iteratop->next;
-  }
-  return iteratop;
-}
-
-void addMove(int x, int y, int moveTo)
-{
-  MoveNode *newNode = new MoveNode();
-  newNode->next = nullptr;
-  newNode->x = x;
-  newNode->y = y;
-  newNode->doneBy = 0;
-  newNode->moveTo = moveTo;
-  if (moveSize)
-  {
-    MoveNode *lastMove = getLastMove();
-    lastMove->next = newNode;
-  }
-  else
-    moveHead = newNode;
-  moveSize = moveSize + 1;
-}
-
-void createSnake(int x, int y)
-{
-  snakeSize = 1;
-  snakeHead = new SnakeNode();
-  snakeHead->next = nullptr;
-  snakeHead->prev = nullptr;
-  snakeHead->x = x;
-  snakeHead->y = y;
-  snakeHead->direction = 4;
-}
+SnakeNode snake[] = {
+    {x : 4, y : 4},
+    {x : 3, y : 4},
+};
 
 void addNewSnake(int x, int y)
 {
-  SnakeNode *newHead = new SnakeNode();
+  SnakeListNode *newHead = new SnakeListNode();
   newHead->next = snakeHead;
   newHead->x = x;
   newHead->y = y;
-  newHead->direction = snakeHead->direction;
   snakeHead = newHead;
-  newHead->prev = snakeHead;
   snakeSize++;
-}
-
-// void addNewSnake(int x, int y)
-// {
-//   SnakeNode *newTail = new SnakeNode();
-//   newTail->next = nullptr;
-//   newTail->prev = snakeHead;
-//   newTail->x = x;
-//   newTail->y = y;
-
-//   SnakeNode *enumerator = snakeHead;
-//   for (size_t index = 0; index < snakeSize - 1; index++)
-//     enumerator = enumerator->next;
-
-//   newTail->direction = enumerator->direction;
-//   enumerator->next = newTail;
-
-//   snakeSize++;
-// }
-
-SnakeNode *getLastNode()
-{
-  SnakeNode *enumerator = snakeHead;
-  while (enumerator->next != NULL)
-  {
-    enumerator = enumerator->next;
-  }
-  return enumerator;
-}
-
-int getCurrentSize()
-{
-  return snakeSize;
-}
-
-void moveSnake(int direction)
-{
-  // 1-top; 2-bot; 3-left; 4-right
-  SnakeNode *last = getLastNode();
-  last->direction = direction;
-  addMove(last->x, last->y, direction);
 }
 
 void initStartScreen()
@@ -153,7 +74,7 @@ void initLoadingScreen()
   lcd.setCursor(0, 0);
   lcd.print("Score: ");
   lcd.setCursor(7, 0);
-  lcd.print(getCurrentSize());
+  // lcd.print(getCurrentSize());
   mtrx.dot(4, 4);
   mtrx.dot(3, 4);
   mtrx.update();
@@ -164,9 +85,67 @@ void startGame()
   if (!gameIsStarted)
   {
     initLoadingScreen();
-    createSnake(3, 4);
+    // createSnake(3, 4);
     return;
   }
+}
+
+void moveSnake(int direction)
+{
+  if (lastDirection == 2 && direction == 1)
+    direction = 2;
+  else if (lastDirection == 1 && direction == 2)
+    direction = 1;
+  else if (lastDirection == 3 && direction == 4)
+    direction = 3;
+  else if (lastDirection == 4 && direction == 3)
+    direction = 4;
+  const int len = sizeof(snake) / sizeof(snake[0]);
+  int prevX = snake[0].x;
+  int prevY = snake[0].y;
+  // 1-top; 2-bot; 3-left; 4-right
+  switch (direction)
+  {
+  case 1:
+    snake[0].y = snake[0].y + 1 == 8 ? 0 : snake[0].y + 1;
+    break;
+  case 2:
+    snake[0].y = snake[0].y - 1 == -1 ? 7 : snake[0].y - 1;
+    break;
+  case 3:
+    snake[0].x = snake[0].x - 1 == -1 ? 7 : snake[0].x - 1;
+    break;
+  case 4:
+    snake[0].x = snake[0].x + 1 == 8 ? 0 : snake[0].x + 1;
+    break;
+  }
+  for (int i = 1; i < len; i++)
+  {
+    // 1-top; 2-bot; 3-left; 4-right
+    int oldX = snake[i].x;
+    int oldY = snake[i].y;
+    snake[i].x = prevX;
+    snake[i].y = prevY;
+    prevX = oldX;
+    prevY = oldY;
+  }
+  lastDirection = direction;
+}
+
+bool checkLoose()
+{
+  const int len = sizeof(snake) / sizeof(snake[0]);
+  for (int i = 0; i < len; i++)
+  {
+    for (int j = 1; j < len - 1; j++)
+    {
+      if (snake[i].x == snake[j].x && snake[i].y == snake[j].y && i != j)
+      {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 void leftButtonClick()
@@ -204,7 +183,7 @@ void upButtonClick()
   }
   else
   {
-    moveSnake(1);
+    moveSnake(2);
   }
 }
 
@@ -217,56 +196,8 @@ void downButtonClick()
   }
   else
   {
-    moveSnake(2);
+    moveSnake(1);
   }
-}
-
-int getNextXStep(SnakeNode *node)
-{
-  // 1-top; 2-bot; 3-left; 4-right
-  switch (node->direction)
-  {
-  case 3:
-    return node->x - 1 == -1 ? 7 : node->x - 1;
-  case 4:
-    return node->x + 1 == 8 ? 0 : node->x + 1;
-  default:
-    return node->x;
-  }
-}
-
-int getNextYStep(SnakeNode *node)
-{
-  // 1-top; 2-bot; 3-left; 4-right
-  switch (node->direction)
-  {
-  case 1:
-    return node->y + 1 == 8 ? 0 : node->y + 1;
-  case 2:
-    return node->y - 1 == -1 ? 7 : node->y - 1;
-  default:
-    return node->y;
-  }
-}
-
-void snakeStep()
-{
-  mtrx.clear();
-  mtrx.clearDisplay();
-  // SnakeNode *last = getLastNode();
-  SnakeNode *enumerator = getLastNode();
-  size_t i = snakeSize;
-
-  while (i > 0)
-  {
-    Serial.println(i);
-    enumerator->x = getNextXStep(enumerator);
-    enumerator->y = getNextYStep(enumerator);
-    mtrx.dot(enumerator->x, enumerator->y, 1);
-    enumerator = enumerator->prev;
-    i--;
-  }
-  mtrx.update();
 }
 
 void setup()
@@ -282,10 +213,10 @@ void setup()
   upButton.attachClick(upButtonClick);
   downButton.attachClick(downButtonClick);
 
-  createSnake(1, 4);
-  addNewSnake(2, 4);
-  addNewSnake(3, 4);
-  addNewSnake(4, 4);
+  snakeHead->next = nullptr;
+  snakeHead->x = 3;
+  snakeHead->y = 4;
+  snakeSize = 1;
 }
 
 void loop()
@@ -309,9 +240,28 @@ void loop()
   //   snakeStep();
   //   mtrx.update();
   // }
+
   if (timeNow - lastTimeChanged > stepDelay)
   {
     lastTimeChanged = timeNow;
-    snakeStep();
+    gameIsOver = checkLoose();
+    if (gameIsOver)
+    {
+      mtrx.clear();
+      mtrx.clearDisplay();
+      // mtrx.line(0, 0, 0, 0, 1);
+    }
+    else
+    {
+      moveSnake(lastDirection);
+      mtrx.clear();
+      mtrx.clearDisplay();
+      const int len = sizeof(snake) / sizeof(snake[0]);
+      for (int i = 0; i < len; i++)
+      {
+        mtrx.dot(snake[i].x, snake[i].y);
+      }
+      mtrx.update();
+    }
   }
 }
