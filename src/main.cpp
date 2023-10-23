@@ -6,7 +6,7 @@
 #include "OneButton.h"
 
 unsigned long lastTimeChanged = millis();
-unsigned long stepDelay = 700;
+unsigned long stepDelay = 300;
 int lastDirection = 4;
 
 MAX7219<1, 1, 9> mtrx; // CS PIN D9, DIN PIN D13, CLK PIN D11
@@ -22,30 +22,22 @@ const char lose_text[] PROGMEM = "GAME OWER";
 bool gameIsStarted = true;
 bool gameIsOver = false;
 
-struct SnakeNode
-{
-  int x;
-  int y;
-  // int direction; // 1-top; 2-bot; 3-left; 4-right
-};
-
 struct SnakeListNode
 {
   int x;
   int y;
 
   SnakeListNode *next;
-  // int direction; // 1-top; 2-bot; 3-left; 4-right
 };
 
 SnakeListNode *snakeHead;
 
 size_t snakeSize;
 
-SnakeNode snake[] = {
-    {x : 4, y : 4},
-    {x : 3, y : 4},
-};
+int getCurrentSize()
+{
+  return snakeSize;
+}
 
 void createSnake(int x, int y)
 {
@@ -83,7 +75,7 @@ void initLoadingScreen()
   lcd.setCursor(0, 0);
   lcd.print("Score: ");
   lcd.setCursor(7, 0);
-  // lcd.print(getCurrentSize());
+  lcd.print(getCurrentSize());
   mtrx.dot(4, 4);
   mtrx.dot(3, 4);
   mtrx.update();
@@ -146,17 +138,17 @@ void moveSnake(int direction)
 
 bool checkLoose()
 {
-  const int len = sizeof(snake) / sizeof(snake[0]);
-  for (int i = 0; i < len; i++)
-  {
-    for (int j = 1; j < len - 1; j++)
-    {
-      if (snake[i].x == snake[j].x && snake[i].y == snake[j].y && i != j)
-      {
-        return true;
-      }
-    }
-  }
+
+  // for (int i = 0; i < len; i++)
+  // {
+  //   for (int j = 1; j < len - 1; j++)
+  //   {
+  //     if (snake[i].x == snake[j].x && snake[i].y == snake[j].y && i != j)
+  //     {
+  //       return true;
+  //     }
+  //   }
+  // }
   return false;
 }
 
@@ -225,11 +217,10 @@ void setup()
   upButton.attachClick(upButtonClick);
   downButton.attachClick(downButtonClick);
 
-  createSnake(3, 4);
+  createSnake(1, 4);
+  addNewSnake(2, 4);
+  addNewSnake(3, 4);
   addNewSnake(4, 4);
-  addNewSnake(5, 4);
-  addNewSnake(6, 4);
-  addNewSnake(7, 4);
 }
 
 void loop()
@@ -257,26 +248,25 @@ void loop()
   if (timeNow - lastTimeChanged > stepDelay)
   {
     lastTimeChanged = timeNow;
-    // gameIsOver = checkLoose();
-    // if (gameIsOver)
-    // {
-    //   mtrx.clear();
-    //   mtrx.clearDisplay();
-    //   // mtrx.line(0, 0, 0, 0, 1);
-    // }
-    // else
-    // {
-    moveSnake(lastDirection);
-    mtrx.clear();
-    mtrx.clearDisplay();
-    // const int len = sizeof(snake) / sizeof(snake[0]);
-    SnakeListNode *iterator = snakeHead;
-    for (size_t i = 0; i < snakeSize; i++)
+    gameIsOver = checkLoose();
+    if (gameIsOver)
     {
-      mtrx.dot(iterator->x, iterator->y);
-      iterator = iterator->next;
+      mtrx.clear();
+      mtrx.clearDisplay();
+      // mtrx.line(0, 0, 0, 0, 1);
     }
-    mtrx.update();
-    // }
+    else
+    {
+      moveSnake(lastDirection);
+      mtrx.clear();
+      mtrx.clearDisplay();
+      SnakeListNode *iterator = snakeHead;
+      for (size_t i = 0; i < snakeSize; i++)
+      {
+        mtrx.dot(iterator->x, iterator->y);
+        iterator = iterator->next;
+      }
+      mtrx.update();
+    }
   }
 }
