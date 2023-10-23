@@ -5,8 +5,14 @@
 #include <GyverMAX7219.h>
 #include "OneButton.h"
 
+const int FRUIT_MAX = 2;
+
 unsigned long lastTimeChanged = millis();
 unsigned long stepDelay = 300;
+
+unsigned long fruitsDelay = 3000;
+unsigned long lastFruitsChanged = millis();
+
 int lastDirection = 4;
 
 MAX7219<1, 1, 9> mtrx; // CS PIN D9, DIN PIN D13, CLK PIN D11
@@ -29,6 +35,25 @@ struct SnakeListNode
 
   SnakeListNode *next;
 };
+
+struct fruit
+{
+  int x;
+  int y;
+};
+
+fruit fruits[FRUIT_MAX] = {
+    {x : (int)random(0, 7), y : (int)random(0, 7)},
+    {x : (int)random(0, 7), y : (int)random(0, 7)},
+};
+
+void generateNewFruits()
+{
+  for (int i = 0; i < FRUIT_MAX; i++)
+  {
+    fruits[i] = {x : (int)random(0, 7), y : (int)random(0, 7)};
+  }
+}
 
 SnakeListNode *snakeHead;
 
@@ -69,16 +94,11 @@ void initStartScreen()
 void initLoadingScreen()
 {
   gameIsStarted = true;
-  mtrx.clear();
-  mtrx.clearDisplay();
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Score: ");
   lcd.setCursor(7, 0);
   lcd.print(getCurrentSize());
-  mtrx.dot(4, 4);
-  mtrx.dot(3, 4);
-  mtrx.update();
 }
 
 void startGame()
@@ -265,6 +285,15 @@ void loop()
       {
         mtrx.dot(iterator->x, iterator->y);
         iterator = iterator->next;
+      }
+      for (int i = 0; i < FRUIT_MAX; i++)
+      {
+        mtrx.dot(fruits[i].x, fruits[i].y, 1);
+      }
+      if (timeNow - lastFruitsChanged > fruitsDelay)
+      {
+        lastFruitsChanged = timeNow;
+        generateNewFruits();
       }
       mtrx.update();
     }
