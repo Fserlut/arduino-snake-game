@@ -20,63 +20,102 @@ const char lose_text[] PROGMEM = "GAME OWER";
 
 bool gameIsStarted = true;
 
-struct CurrentStepState
-{
-  bool x;
-  bool y;
-  bool isPositive;
-  int moveIndex;
-};
-
 struct SnakeNode
 {
   int x;
   int y;
+  int direction; // 1-top; 2-bot; 3-left; 4-right
   SnakeNode *next;
+  SnakeNode *prev;
 };
 
-SnakeNode *head;
-size_t listSize;
-
-CurrentStepState currentStepState = {x : true, y : false, isPositive : true, moveIndex : -1};
-
-void createLinkedList(int x, int y)
+struct MoveNode
 {
-  listSize = 1;
-  head = new SnakeNode();
-  head->next = nullptr;
-  head->x = x;
-  head->y = y;
+  int x;      // Coords when move was created
+  int y;      // Coords when move was created
+  int moveTo; // 1-top; 2-bot; 3-left; 4-right
+  int doneBy; // Counter done all dots or not
+
+  MoveNode *next;
+};
+
+MoveNode *moveHead;
+SnakeNode *snakeHead;
+size_t snakeSize;
+size_t moveSize = 0;
+
+MoveNode *getLastMove()
+{
+  MoveNode *iteratop = moveHead;
+  while (iteratop->next != NULL)
+  {
+    iteratop = iteratop->next;
+  }
+  return iteratop;
 }
 
-void insertHead(int x, int y)
+void addMove(int x, int y, int moveTo)
+{
+  MoveNode *newNode = new MoveNode();
+  newNode->next = nullptr;
+  newNode->x = x;
+  newNode->y = y;
+  newNode->doneBy = 0;
+  newNode->moveTo = moveTo;
+  if (moveSize)
+  {
+    MoveNode *lastMove = getLastMove();
+    lastMove->next = newNode;
+  }
+  else
+    moveHead = newNode;
+  moveSize = moveSize + 1;
+}
+
+void createSnake(int x, int y)
+{
+  snakeSize = 1;
+  snakeHead = new SnakeNode();
+  snakeHead->next = nullptr;
+  snakeHead->prev = nullptr;
+  snakeHead->x = x;
+  snakeHead->y = y;
+  snakeHead->direction = 4;
+}
+
+void addNewSnake(int x, int y)
 {
   SnakeNode *newHead = new SnakeNode();
-  newHead->next = head;
+  newHead->next = snakeHead;
   newHead->x = x;
   newHead->y = y;
-  head = newHead;
-  listSize++;
+  newHead->direction = snakeHead->direction;
+  snakeHead = newHead;
+  newHead->prev = snakeHead;
+  snakeSize++;
 }
 
-void insertTail(int x, int y)
-{
-  SnakeNode *newTail = new SnakeNode();
-  newTail->next = nullptr;
-  newTail->x = x;
-  newTail->y = y;
+// void addNewSnake(int x, int y)
+// {
+//   SnakeNode *newTail = new SnakeNode();
+//   newTail->next = nullptr;
+//   newTail->prev = snakeHead;
+//   newTail->x = x;
+//   newTail->y = y;
 
-  SnakeNode *enumerator = head;
-  for (size_t index = 0; index < listSize - 1; index++)
-    enumerator = enumerator->next;
+//   SnakeNode *enumerator = snakeHead;
+//   for (size_t index = 0; index < snakeSize - 1; index++)
+//     enumerator = enumerator->next;
 
-  enumerator->next = newTail;
-  listSize++;
-}
+//   newTail->direction = enumerator->direction;
+//   enumerator->next = newTail;
+
+//   snakeSize++;
+// }
 
 SnakeNode *getLastNode()
 {
-  SnakeNode *enumerator = head;
+  SnakeNode *enumerator = snakeHead;
   while (enumerator->next != NULL)
   {
     enumerator = enumerator->next;
@@ -86,49 +125,15 @@ SnakeNode *getLastNode()
 
 int getCurrentSize()
 {
-  return listSize;
+  return snakeSize;
 }
 
 void moveSnake(int direction)
 {
-  // Нужен какой-то массив, который будут хранить в себе все повороты, чтобы при большой длинне это все работало
-  if (direction == 1 && currentStepState.y && currentStepState.isPositive)
-    return;
-  if (direction == 2 && currentStepState.y && !currentStepState.isPositive)
-    return;
-  if (direction == 3 && currentStepState.x && !currentStepState.isPositive)
-    return;
-  if (direction == 4 && currentStepState.x && currentStepState.isPositive)
-    return;
   // 1-top; 2-bot; 3-left; 4-right
   SnakeNode *last = getLastNode();
-  switch (direction)
-  {
-  case 1:
-    currentStepState.x = false;
-    currentStepState.y = true;
-    currentStepState.isPositive = false;
-    currentStepState.moveIndex = last->x;
-    break;
-  case 2:
-    currentStepState.x = false;
-    currentStepState.y = true;
-    currentStepState.isPositive = true;
-    currentStepState.moveIndex = last->x;
-    break;
-  case 3:
-    currentStepState.x = true;
-    currentStepState.y = false;
-    currentStepState.isPositive = false;
-    currentStepState.moveIndex = last->y;
-    break;
-  case 4:
-    currentStepState.x = true;
-    currentStepState.y = false;
-    currentStepState.isPositive = true;
-    currentStepState.moveIndex = last->y;
-    break;
-  }
+  last->direction = direction;
+  addMove(last->x, last->y, direction);
 }
 
 void initStartScreen()
@@ -159,8 +164,7 @@ void startGame()
   if (!gameIsStarted)
   {
     initLoadingScreen();
-    createLinkedList(3, 4);
-    createLinkedList(4, 4);
+    createSnake(3, 4);
     return;
   }
 }
@@ -217,72 +221,50 @@ void downButtonClick()
   }
 }
 
+int getNextXStep(SnakeNode *node)
+{
+  // 1-top; 2-bot; 3-left; 4-right
+  switch (node->direction)
+  {
+  case 3:
+    return node->x - 1 == -1 ? 7 : node->x - 1;
+  case 4:
+    return node->x + 1 == 8 ? 0 : node->x + 1;
+  default:
+    return node->x;
+  }
+}
+
+int getNextYStep(SnakeNode *node)
+{
+  // 1-top; 2-bot; 3-left; 4-right
+  switch (node->direction)
+  {
+  case 1:
+    return node->y + 1 == 8 ? 0 : node->y + 1;
+  case 2:
+    return node->y - 1 == -1 ? 7 : node->y - 1;
+  default:
+    return node->y;
+  }
+}
+
 void snakeStep()
 {
   mtrx.clear();
   mtrx.clearDisplay();
-  SnakeNode *enumerator = head;
-  size_t i = 0;
+  // SnakeNode *last = getLastNode();
+  SnakeNode *enumerator = getLastNode();
+  size_t i = snakeSize;
 
-  while (i < listSize)
+  while (i > 0)
   {
-    int nextX = enumerator->x;
-    int nextY = enumerator->y;
-    if (currentStepState.x)
-    {
-      if (currentStepState.isPositive)
-      {
-        if (currentStepState.moveIndex == nextY || currentStepState.moveIndex == -1)
-        {
-          nextX = enumerator->x + 1 == 8 ? 0 : enumerator->x + 1;
-        }
-        else
-        {
-          nextY = nextY + 1;
-        }
-      }
-      else
-      {
-        if (currentStepState.moveIndex == nextY || currentStepState.moveIndex == -1)
-        {
-          nextX = enumerator->x - 1 == -1 ? 7 : enumerator->x - 1;
-        }
-        else
-        {
-          nextY = nextY + 1;
-        }
-      }
-    }
-    else
-    {
-      if (currentStepState.isPositive)
-      {
-        if (currentStepState.moveIndex == nextX)
-        {
-          nextY = enumerator->y + 1 == 8 ? 0 : enumerator->y + 1;
-        }
-        else
-        {
-          nextX = nextX + 1;
-        }
-      }
-      else
-      {
-        if (currentStepState.moveIndex == nextX)
-        {
-          nextY = enumerator->y - 1 == -1 ? 7 : enumerator->y - 1;
-        }
-        else
-        {
-          nextX = nextX + 1;
-        }
-      }
-    }
-    enumerator->x = nextX;
-    enumerator->y = nextY;
-    mtrx.dot(nextX, nextY, 1);
-    enumerator = enumerator->next;
-    i++;
+    Serial.println(i);
+    enumerator->x = getNextXStep(enumerator);
+    enumerator->y = getNextYStep(enumerator);
+    mtrx.dot(enumerator->x, enumerator->y, 1);
+    enumerator = enumerator->prev;
+    i--;
   }
   mtrx.update();
 }
@@ -300,10 +282,10 @@ void setup()
   upButton.attachClick(upButtonClick);
   downButton.attachClick(downButtonClick);
 
-  createLinkedList(1, 4);
-  insertTail(2, 4);
-  insertTail(3, 4);
-  insertTail(4, 4);
+  createSnake(1, 4);
+  addNewSnake(2, 4);
+  addNewSnake(3, 4);
+  addNewSnake(4, 4);
 }
 
 void loop()
