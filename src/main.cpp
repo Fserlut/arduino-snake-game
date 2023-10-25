@@ -23,10 +23,13 @@ OneButton rightButton(6, true); // right button on d6 pin
 OneButton upButton(7, true);    // up button on d7 pin
 OneButton downButton(5, true);  // down button on d5 pin
 
-const char lose_text[] = "GAME OWER";
+const char *lose_text = "GAME OVER";
+const char *start_text = "Press any key for start";
+const char *score_text = "Score: ";
 
 bool gameIsStarted = false;
 bool gameIsOver = false;
+bool gameIsPaused = false;
 
 struct SnakeListNode
 {
@@ -85,10 +88,18 @@ void addNewSnake(int x, int y)
 
 void initStartScreen()
 {
-  lcd.setCursor(0, 0);
-  lcd.print("Press any key");
-  lcd.setCursor(0, 1);
-  lcd.print("for start...");
+  if (gameIsPaused)
+  {
+    lcd.setCursor(0, 0);
+    lcd.print("Game on pause");
+  }
+  else
+  {
+    lcd.setCursor(0, 0);
+    lcd.print("Press any key");
+    lcd.setCursor(0, 1);
+    lcd.print("for start...");
+  }
 }
 
 void initLoadingScreen()
@@ -96,16 +107,28 @@ void initLoadingScreen()
   gameIsStarted = true;
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Score: ");
+  lcd.print(score_text);
   lcd.setCursor(7, 0);
   lcd.print(getCurrentSize());
+}
+
+void showGameOver()
+{
+  gameIsOver = true;
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(lose_text);
+  lcd.setCursor(0, 1);
+  lcd.print(score_text);
+  lcd.print(getCurrentSize());
+  lcd.blink();
 }
 
 void updateCurrentScore()
 {
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Score: ");
+  lcd.print(score_text);
   lcd.setCursor(7, 0);
   lcd.print(getCurrentSize());
 }
@@ -115,7 +138,6 @@ void startGame()
   if (!gameIsStarted)
   {
     initLoadingScreen();
-    // createSnake(3, 4);
     return;
   }
 }
@@ -200,72 +222,70 @@ void moveSnake(int direction)
   lastDirection = direction;
 }
 
-bool checkLoose()
+void checkLoose()
 {
-
-  // for (int i = 0; i < len; i++)
-  // {
-  //   for (int j = 1; j < len - 1; j++)
-  //   {
-  //     if (snake[i].x == snake[j].x && snake[i].y == snake[j].y && i != j)
-  //     {
-  //       return true;
-  //     }
-  //   }
-  // }
-  return false;
+  SnakeListNode *iterator = snakeHead;
+  SnakeListNode *iteratorNext = snakeHead->next;
+  while (iterator->next != NULL)
+  {
+    while (iteratorNext->next != NULL)
+    {
+      if (iterator->x == iteratorNext->x && iterator->y == iteratorNext->y)
+      {
+        showGameOver();
+        return;
+      }
+      iteratorNext = iteratorNext->next;
+    }
+    iterator = iterator->next;
+  }
+  return;
 }
 
 void leftButtonClick()
 {
-  Serial.println("Left button click");
   if (!gameIsStarted)
   {
     startGame();
+    return;
   }
-  else
-  {
-    moveSnake(3);
-  }
+  moveSnake(3);
 }
 
 void rightButtonClick()
 {
-  Serial.println("right button click");
   if (!gameIsStarted)
   {
     startGame();
+    return;
   }
-  else
-  {
-    moveSnake(4);
-  }
+  moveSnake(4);
 }
 
 void upButtonClick()
 {
-  Serial.println("Up button click");
   if (!gameIsStarted)
   {
     startGame();
+    return;
   }
-  else
-  {
-    moveSnake(2);
-  }
+  moveSnake(2);
 }
 
 void downButtonClick()
 {
-  Serial.println("Down button click");
   if (!gameIsStarted)
   {
     startGame();
+    return;
   }
-  else
-  {
-    moveSnake(1);
-  }
+  moveSnake(1);
+}
+
+void pauseOrUnpauseGame()
+{
+  updateCurrentScore();
+  gameIsPaused = !gameIsPaused;
 }
 
 void setup()
@@ -280,6 +300,11 @@ void setup()
   rightButton.attachClick(rightButtonClick);
   upButton.attachClick(upButtonClick);
   downButton.attachClick(downButtonClick);
+
+  leftButton.attachLongPressStart(pauseOrUnpauseGame);
+  rightButton.attachLongPressStart(pauseOrUnpauseGame);
+  upButton.attachLongPressStart(pauseOrUnpauseGame);
+  downButton.attachLongPressStart(pauseOrUnpauseGame);
 
   createSnake(1, 4);
   addNewSnake(2, 4);
@@ -296,50 +321,43 @@ void loop()
   upButton.tick();
   downButton.tick();
 
-  // if (!gameIsStarted)
-  // {
-  //   initStartScreen();
-  //   delay(1000);
-  //   lcd.blink();
-  // }
-  // else
-  // {
-  //   delay(1000);
-  //   // snakeStep();
-  //   // mtrx.update();
-  // }
-
-  if (timeNow - lastTimeChanged > stepDelay)
+  if (!gameIsStarted || gameIsPaused)
   {
-    lastTimeChanged = timeNow;
-    gameIsOver = checkLoose();
-    if (gameIsOver)
+    initStartScreen();
+  }
+  else
+  {
+    if (timeNow - lastTimeChanged > stepDelay)
     {
-      mtrx.clear();
-      mtrx.clearDisplay();
-      // mtrx.line(0, 0, 0, 0, 1);
-    }
-    else
-    {
-      moveSnake(lastDirection);
-      mtrx.clear();
-      mtrx.clearDisplay();
-      SnakeListNode *iterator = snakeHead;
-      for (size_t i = 0; i < snakeSize; i++)
+      lastTimeChanged = timeNow;
+      checkLoose();
+      if (gameIsOver)
       {
-        mtrx.dot(iterator->x, iterator->y);
-        iterator = iterator->next;
+        mtrx.clear();
+        mtrx.clearDisplay();
       }
-      for (int i = 0; i < FRUIT_MAX; i++)
+      else
       {
-        mtrx.dot(fruits[i].x, fruits[i].y, 1);
+        moveSnake(lastDirection);
+        mtrx.clear();
+        mtrx.clearDisplay();
+        SnakeListNode *iterator = snakeHead;
+        for (size_t i = 0; i < snakeSize; i++)
+        {
+          mtrx.dot(iterator->x, iterator->y);
+          iterator = iterator->next;
+        }
+        for (int i = 0; i < FRUIT_MAX; i++)
+        {
+          mtrx.dot(fruits[i].x, fruits[i].y, 1);
+        }
+        if (timeNow - lastFruitsChanged > fruitsDelay)
+        {
+          lastFruitsChanged = timeNow;
+          generateNewFruits();
+        }
+        mtrx.update();
       }
-      if (timeNow - lastFruitsChanged > fruitsDelay)
-      {
-        lastFruitsChanged = timeNow;
-        generateNewFruits();
-      }
-      mtrx.update();
     }
   }
 }
