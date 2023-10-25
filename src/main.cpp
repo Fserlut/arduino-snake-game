@@ -294,7 +294,7 @@ void setup()
   lcd.init();
   lcd.backlight();
   mtrx.begin();
-  mtrx.setBright(5);
+  mtrx.setBright(4);
 
   leftButton.attachClick(leftButtonClick);
   rightButton.attachClick(rightButtonClick);
